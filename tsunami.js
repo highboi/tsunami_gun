@@ -27,26 +27,21 @@ async function seedTorrent(url) {
 	var responseBuffer = await response.arrayBuffer();
 	var buffer = new Uint8Array(responseBuffer);
 
-	//make an array to store file fragments
+	//divide the file data into fragments and store into an array
 	var fragments = [];
-
-	//divide the file data/buffer into fragments and store them in the fragments array
 	for (var byteindex = 0; byteindex < buffer.length; byteindex += 100) {
 		//make a fragment object with the position, data, and associated url to be put into the fragments array
 		var fragment = buffer.slice(byteindex, byteindex+100);
 		fragments.push(fragment);
 	}
 
-	//make an array for storing the positions of the file fragments for reassembly
-	var positions = [];
 
-	//check gun.js for any data fragments that are already on the network and store fragments not already stored on the network
+	//get the position of each file fragment and update file data on gun.js
+	var positions = [];
 	for (var frag in fragments) {
-		//check for a preexisting file fragment for this url/file
+		//update gun.js if this fragment is not up to date with the file from the url
 		var fragment_key = frag + "_" +  url
 		var gun_fragment = await getGunData(fragment_key);
-
-		//store the fragment that is not on the gun.js network yet
 		if (gun_fragment != {fragment: JSON.stringify(fragments[frag])}) {
 			gun.get(fragment_key).put({fragment: JSON.stringify(fragments[frag])});
 		}
@@ -55,7 +50,7 @@ async function seedTorrent(url) {
 		positions.push(frag);
 	}
 
-	//store the ledger for file fragments on gun.js
+	//store the ledger containing positions of file fragments and the file type on gun.js
 	var fragment_ledger_key = url + "_ledger";
 	gun.get(fragment_ledger_key).put({positions: JSON.stringify(positions), filetype: filetype});
 
@@ -72,10 +67,8 @@ async function downloadTorrent(url) {
 	var main_ledger = await getGunData(ledger_key);
 	ledger = JSON.parse(main_ledger.positions);
 
-	//an array to store all of the file fragments
+	//get file fragments from the gun.js network
 	var fragments = [];
-
-	//loop through all of the file positions to get the file fragments
 	for (var position in ledger) {
 		//get the file fragment for this position
 		var fragment_key = position.toString() + "_" + url;
@@ -86,25 +79,21 @@ async function downloadTorrent(url) {
 		fragments.push(JSON.parse(fragment));
 	}
 
-	//store the raw bytes of file data
+	//extract bytes of raw data from the file fragments
 	var bytes = [];
-
-	//add the bytes to the final bytes array
 	for (var frag of fragments) {
 		for (var byte of Object.values(frag)) {
 			bytes.push(byte);
 		}
 	}
 
-	//make an array buffer/integer array from the bytes
+	//convert the byte array into a blob object
 	var buffer = Uint8Array.from(bytes);
-
-	//make a new blob object out of this data
 	var blob = new Blob([buffer], {
 		type: main_ledger.filetype
 	});
 
-	//make a final file url reference to the file data
+	//make a url reference to the blob object for accessing the file data
 	var fileurl = URL.createObjectURL(blob);
 
 	//return the file fragments for processing
@@ -115,33 +104,17 @@ async function downloadTorrent(url) {
 STORE THE CURRENT WEBPAGE
 */
 function storeCurrentPage() {
-	//get the current url the user is on
+	//get the current url and webpage text
 	var currentURL = window.location.pathname;
-
-	//get the entire document text of the current page
 	var documentText = document.documentElement.outerHTML;
 
-	//store the webpage
+	//store the webpage on gun.js
 	gun.get(currentURL).put({
 		document_html: documentText
 	});
 
-	return;
+	return true;
 }
-
-/*
-TRY TO GET THE CURRENT WEBPAGE FROM THE P2P DATABASE
-*/
-async function getCurrentPage() {
-	//get the current url the user is on
-	var currentURL = window.location.pathname;
-
-	//get the current webpage text through gun js
-	var current_doc = await getGunData(currentURL);
-
-	return current_doc;
-}
-
 
 /*
 MAIN GUN JS FUNCTIONALITY
@@ -161,20 +134,19 @@ MAIN GUN JS FUNCTIONALITY
 	//extract the links for each anchor on the current page
 	var page_links = [];
 	link_elements.forEach((item, index) => {
-		//get the full relative path of the current webpage
+		//get the full relative path of the current webpage and store it to the array
 		var full_link = item.pathname + item.search;
-
-		//add this link to the page_links array
 		page_links.push(full_link);
 	});
 
 	//get the document bodys stored on gun js
 	var texts = [];
 	for (var index in page_links) {
+		//get the link to another webpage
 		var link = page_links[index];
-
 		var gunlink = await getGunData(link);
 
+		//extract the html from the gun.js network
 		if (gunlink != undefined) {
 			texts.push(gunlink.document_html);
 		} else {
@@ -184,16 +156,15 @@ MAIN GUN JS FUNCTIONALITY
 
 	//add event listeners for each anchor tag
 	link_elements.forEach((item, index) => {
+		//replace the current document with the document from gun.js if the link is clicked
 		item.onclick = (event) => {
-			//get the document text associated with this link on gun js
+			//get the html document associated with this link
 			var document_text = texts[index];
-
-			//if gun has this link stored, then redirect the user without requesting the server
 			if (document_text != undefined) {
 				//replace the current entry in the session history with the link the user clicked on
 				history.replaceState(null, "", page_links[index]);
 
-				//write the gun-stored document text to the page
+				//replace the html with the new webpage document
 				document.open();
 				document.write(document_text);
 				document.close();
