@@ -18,8 +18,8 @@ GET/DOWNLOAD FILE FRAGMENTS FROM GUN DB
 async function getGunFileData(url) {
 	//get the ledger of file fragments for this url
 	var ledger_key = url + "_ledger";
-	var ledger = await getGunData(ledger_key);
-	ledger = JSON.parse(ledger.positions);
+	var main_ledger = await getGunData(ledger_key);
+	ledger = JSON.parse(main_ledger.positions);
 
 	//an array to store all of the file fragments
 	var fragments = [];
@@ -48,8 +48,16 @@ async function getGunFileData(url) {
 	//make an array buffer/integer array from the bytes
 	var buffer = Uint8Array.from(bytes);
 
+	//make a new blob object out of this data
+	var blob = new Blob([buffer], {
+		type: main_ledger.filetype
+	});
+
+	//make a final file url reference to the file data
+	var fileurl = URL.createObjectURL(blob);
+
 	//return the file fragments for processing
-	return buffer;
+	return fileurl;
 }
 
 /*
@@ -172,6 +180,9 @@ MAIN GUN JS FUNCTIONALITY
 		var urlRequest = new Request(url);
 		var response = await fetch(urlRequest);
 
+		//get the file type
+		var filetype = response.headers.get("content-type");
+
 		//extract the array buffer from the returned data
 		var responseBuffer = await response.arrayBuffer();
 		var buffer = new Uint8Array(responseBuffer);
@@ -196,7 +207,7 @@ MAIN GUN JS FUNCTIONALITY
 			var gun_fragment = await getGunData(fragment_key);
 
 			//store the fragment that is not on the gun.js network yet
-			if (gun_fragment == undefined) {
+			if (gun_fragment != {fragment: JSON.stringify(fragments[frag])}) {
 				gun.get(fragment_key).put({fragment: JSON.stringify(fragments[frag])});
 			}
 
@@ -206,6 +217,6 @@ MAIN GUN JS FUNCTIONALITY
 
 		//store the ledger for file fragments on gun.js
 		var fragment_ledger_key = url + "_ledger";
-		gun.get(fragment_ledger_key).put({positions: JSON.stringify(positions)});
+		gun.get(fragment_ledger_key).put({positions: JSON.stringify(positions), filetype: filetype});
 	}
 })();
