@@ -13,9 +13,60 @@ function getGunData(id) {
 }
 
 /*
+UPLOAD/SEED FILE FRAGMENTS TO GUN DB FOR TORRENTING
+*/
+async function seedTorrent(url) {
+	//request information/data from the url
+	var urlRequest = new Request(url);
+	var response = await fetch(urlRequest);
+
+	//get the file type
+	var filetype = response.headers.get("content-type");
+
+	//extract the array buffer from the returned data
+	var responseBuffer = await response.arrayBuffer();
+	var buffer = new Uint8Array(responseBuffer);
+
+	//make an array to store file fragments
+	var fragments = [];
+
+	//divide the file data/buffer into fragments and store them in the fragments array
+	for (var byteindex = 0; byteindex < buffer.length; byteindex += 100) {
+		//make a fragment object with the position, data, and associated url to be put into the fragments array
+		var fragment = buffer.slice(byteindex, byteindex+100);
+		fragments.push(fragment);
+	}
+
+	//make an array for storing the positions of the file fragments for reassembly
+	var positions = [];
+
+	//check gun.js for any data fragments that are already on the network and store fragments not already stored on the network
+	for (var frag in fragments) {
+		//check for a preexisting file fragment for this url/file
+		var fragment_key = frag + "_" +  url
+		var gun_fragment = await getGunData(fragment_key);
+
+		//store the fragment that is not on the gun.js network yet
+		if (gun_fragment != {fragment: JSON.stringify(fragments[frag])}) {
+			gun.get(fragment_key).put({fragment: JSON.stringify(fragments[frag])});
+		}
+
+		//push the current fragment index to an array of file fragment positions
+		positions.push(frag);
+	}
+
+	//store the ledger for file fragments on gun.js
+	var fragment_ledger_key = url + "_ledger";
+	gun.get(fragment_ledger_key).put({positions: JSON.stringify(positions), filetype: filetype});
+
+	//return a value of true since the seeding of the torrent succeeded
+	return true;
+}
+
+/*
 GET/DOWNLOAD FILE FRAGMENTS FROM GUN DB
 */
-async function getGunFileData(url) {
+async function downloadTorrent(url) {
 	//get the ledger of file fragments for this url
 	var ledger_key = url + "_ledger";
 	var main_ledger = await getGunData(ledger_key);
@@ -175,48 +226,8 @@ MAIN GUN JS FUNCTIONALITY
 		}
 	}
 
+	//seed each of the file urls using gun.js
 	for (var url of sourceUrls) {
-		//request information/data from the url
-		var urlRequest = new Request(url);
-		var response = await fetch(urlRequest);
-
-		//get the file type
-		var filetype = response.headers.get("content-type");
-
-		//extract the array buffer from the returned data
-		var responseBuffer = await response.arrayBuffer();
-		var buffer = new Uint8Array(responseBuffer);
-
-		//make an array to store file fragments
-		var fragments = [];
-
-		//divide the file data/buffer into fragments and store them in the fragments array
-		for (var byteindex = 0; byteindex < buffer.length; byteindex += 100) {
-			//make a fragment object with the position, data, and associated url to be put into the fragments array
-			var fragment = buffer.slice(byteindex, byteindex+100);
-			fragments.push(fragment);
-		}
-
-		//make an array for storing the positions of the file fragments for reassembly
-		var positions = [];
-
-		//check gun.js for any data fragments that are already on the network and store fragments not already stored on the network
-		for (var frag in fragments) {
-			//check for a preexisting file fragment for this url/file
-			var fragment_key = frag + "_" +  url
-			var gun_fragment = await getGunData(fragment_key);
-
-			//store the fragment that is not on the gun.js network yet
-			if (gun_fragment != {fragment: JSON.stringify(fragments[frag])}) {
-				gun.get(fragment_key).put({fragment: JSON.stringify(fragments[frag])});
-			}
-
-			//push the current fragment index to an array of file fragment positions
-			positions.push(frag);
-		}
-
-		//store the ledger for file fragments on gun.js
-		var fragment_ledger_key = url + "_ledger";
-		gun.get(fragment_ledger_key).put({positions: JSON.stringify(positions), filetype: filetype});
+		await seedTorrent(url);
 	}
 })();
