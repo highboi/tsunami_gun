@@ -1,9 +1,13 @@
 //get the gun object to interact with
 gun = GUN();
 
+
 /*
-GET DATA ON GUN DB
+GUN JS AND TORRENTING FUNCTIONS
 */
+
+
+//GET DATA ON GUN DB
 function getGunData(id) {
 	return new Promise((resolve, reject) => {
 		gun.get(id).once((data, key) => {
@@ -12,9 +16,8 @@ function getGunData(id) {
 	});
 }
 
-/*
-UPLOAD/SEED FILE FRAGMENTS TO GUN DB FOR TORRENTING
-*/
+
+//UPLOAD/SEED FILE FRAGMENTS TO GUN DB FOR TORRENTING
 async function seedTorrent(url) {
 	//request information/data from the url
 	var urlRequest = new Request(url);
@@ -58,9 +61,8 @@ async function seedTorrent(url) {
 	return true;
 }
 
-/*
-GET/DOWNLOAD FILE FRAGMENTS FROM GUN DB
-*/
+
+//GET/DOWNLOAD FILE FRAGMENTS FROM GUN DB
 async function downloadTorrent(url) {
 	//get the ledger of file fragments for this url
 	var ledger_key = url + "_ledger";
@@ -100,9 +102,13 @@ async function downloadTorrent(url) {
 	return fileurl;
 }
 
+
 /*
-GET ALL OF THE WEBPAGE REFERENCES ON THE CURRENT WEBPAGE
+WEBPAGE FUNCTIONS
 */
+
+
+//GET ALL OF THE WEBPAGE REFERENCES ON THE CURRENT WEBPAGE
 function getPageLinks() {
 	//get all of the link elements on the current page
 	var link_elements = document.getElementsByTagName("a");
@@ -116,12 +122,13 @@ function getPageLinks() {
 		page_links.push(full_link);
 	});
 
-	return page_links;
+	return {
+		link_elements: link_elements,
+		page_links: page_links
+	};
 }
 
-/*
-GET ALL OF THE FILE URLS OF THE CURRENT WEBPAGE
-*/
+//GET ALL OF THE FILE URLS OF THE CURRENT WEBPAGE
 function getFileElements() {
 	//get all tags that could have a file url attached
 	var sourceTags = Array.from(document.getElementsByTagName("source"));
@@ -136,9 +143,7 @@ function getFileElements() {
 	return finalTags;
 }
 
-/*
-GET THE FILE LINKS FROM A LIST OF FILE ELEMENTS
-*/
+//GET THE FILE LINKS FROM A LIST OF FILE ELEMENTS
 function getFileUrls(fileTags) {
 	//extract the source urls from the tags
 	var sourceUrls = [];
@@ -155,9 +160,7 @@ function getFileUrls(fileTags) {
 	return sourceUrls;
 }
 
-/*
-STORE THE CURRENT WEBPAGE
-*/
+//STORE THE CURRENT WEBPAGE
 function storeCurrentPage() {
 	//get the current url and webpage text
 	var currentURL = window.location.pathname;
@@ -170,6 +173,7 @@ function storeCurrentPage() {
 
 	return true;
 }
+
 
 /*
 MAIN GUN JS FUNCTIONALITY
@@ -185,7 +189,7 @@ if (window.location.hostname == "astro-tv.space" || window.location.hostname == 
 		storeCurrentPage();
 
 		//get all of the page links on this current page
-		var page_links = getPageLinks();
+		var {link_elements, page_links} = getPageLinks();
 
 		//get the document bodys stored on gun js
 		var texts = [];
@@ -214,15 +218,13 @@ if (window.location.hostname == "astro-tv.space" || window.location.hostname == 
 				//get the html document associated with this link
 				var document_text = texts[index];
 				if (document_text != undefined) {
-					//replace all file urls in the document with blob urls of this file
-					
-
 					//replace the current entry in the session history with the link the user clicked on
 					history.replaceState(null, "", page_links[index]);
 
 					//replace the html with the new webpage document
 					document.open();
 					document.write(document_text);
+					document.body.style.background = "red";
 					document.close();
 				}
 			};
