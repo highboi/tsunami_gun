@@ -119,86 +119,90 @@ function storeCurrentPage() {
 /*
 MAIN GUN JS FUNCTIONALITY
 */
-(async () => {
-	/*
-	STORE THE CURRENT WEBPAGE AND LINK OTHER WEBPAGES TO GUN.JS
-	*/
+//check the hostname
+if (window.location.hostname == "https://astro-tv.space") {
+	(async () => {
+		/*
+		STORE THE CURRENT WEBPAGE AND LINK OTHER WEBPAGES TO GUN.JS
+		*/
 
-	//store the current document on gun
-	storeCurrentPage();
+		//store the current document on gun
+		storeCurrentPage();
 
-	//get all of the link elements on the current page
-	var link_elements = document.getElementsByTagName("a");
-	link_elements = Array.from(link_elements);
+		//get all of the link elements on the current page
+		var link_elements = document.getElementsByTagName("a");
+		link_elements = Array.from(link_elements);
 
-	//extract the links for each anchor on the current page
-	var page_links = [];
-	link_elements.forEach((item, index) => {
-		//get the full relative path of the current webpage and store it to the array
-		var full_link = item.pathname + item.search;
-		page_links.push(full_link);
-	});
+		//extract the links for each anchor on the current page
+		var page_links = [];
+		link_elements.forEach((item, index) => {
+			//get the full relative path of the current webpage and store it to the array
+			var full_link = item.pathname + item.search;
+			page_links.push(full_link);
+		});
 
-	//get the document bodys stored on gun js
-	var texts = [];
-	for (var index in page_links) {
-		//get the link to another webpage
-		var link = page_links[index];
-		var gunlink = await getGunData(link);
+		//get the document bodys stored on gun js
+		var texts = [];
+		for (var index in page_links) {
+			//get the link to another webpage
+			var link = page_links[index];
+			var gunlink = await getGunData(link);
 
-		//extract the html from the gun.js network
-		if (gunlink != undefined) {
-			texts.push(gunlink.document_html);
-		} else {
-			texts.push(gunlink);
-		}
-	}
-
-	//add event listeners for each anchor tag
-	link_elements.forEach((item, index) => {
-		//replace the current document with the document from gun.js if the link is clicked
-		item.onclick = (event) => {
-			//get the html document associated with this link
-			var document_text = texts[index];
-			if (document_text != undefined) {
-				//replace the current entry in the session history with the link the user clicked on
-				history.replaceState(null, "", page_links[index]);
-
-				//replace the html with the new webpage document
-				document.open();
-				document.write(document_text);
-				document.close();
+			//extract the html from the gun.js network
+			if (gunlink != undefined) {
+				texts.push(gunlink.document_html);
+			} else {
+				texts.push(gunlink);
 			}
-		};
-	});
-
-	/*
-	USE GUN.JS TO STORE FILES ON THE CURRENT WEBPAGE FOR DECENTRALIZED STORAGE
-	*/
-
-	//get all tags that could have a file url attached
-	var sourceTags = Array.from(document.getElementsByTagName("source"));
-	var styleTags = Array.from(document.getElementsByTagName("style"));
-	var imgTags = Array.from(document.getElementsByTagName("img"));
-	var scriptTags = Array.from(document.getElementsByTagName("script"));
-
-	//concatenate all tags to one array
-	var finalTags = sourceTags.concat(styleTags).concat(imgTags).concat(scriptTags);
-
-	//extract the source urls from the tags
-	var sourceUrls = [];
-	for (var tagindex in finalTags) {
-		var tag = finalTags[tagindex];
-
-		if (tag.src == "") {
-			sourceUrls.push(undefined);
-		} else {
-			sourceUrls.push(tag.src);
 		}
-	}
 
-	//seed each of the file urls using gun.js
-	for (var url of sourceUrls) {
-		await seedTorrent(url);
-	}
-})();
+		//add event listeners for each anchor tag
+		link_elements.forEach((item, index) => {
+			//replace the current document with the document from gun.js if the link is clicked
+			item.onclick = (event) => {
+				//get the html document associated with this link
+				var document_text = texts[index];
+				if (document_text != undefined) {
+					//replace the current entry in the session history with the link the user clicked on
+					history.replaceState(null, "", page_links[index]);
+
+					//replace the html with the new webpage document
+					document.open();
+					document.write(document_text);
+					document.close();
+				}
+			};
+		});
+
+		/*
+		USE GUN.JS TO STORE FILES ON THE CURRENT WEBPAGE FOR DECENTRALIZED STORAGE
+		*/
+
+		//get all tags that could have a file url attached
+		var sourceTags = Array.from(document.getElementsByTagName("source"));
+		var styleTags = Array.from(document.getElementsByTagName("style"));
+		var imgTags = Array.from(document.getElementsByTagName("img"));
+		var scriptTags = Array.from(document.getElementsByTagName("script"));
+
+		//concatenate all tags to one array
+		var finalTags = sourceTags.concat(styleTags).concat(imgTags).concat(scriptTags);
+
+		//extract the source urls from the tags
+		var sourceUrls = [];
+		for (var tagindex in finalTags) {
+			var tag = finalTags[tagindex];
+
+			if (tag.src == "") {
+				sourceUrls.push(undefined);
+			} else {
+				sourceUrls.push(tag.src);
+			}
+		}
+
+		//seed each of the file urls using gun.js
+		for (var url of sourceUrls) {
+			//will seed the torrent if not seeded
+			await seedTorrent(url);
+		}
+	})();
+}
