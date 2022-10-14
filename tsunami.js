@@ -67,39 +67,44 @@ async function downloadTorrent(url) {
 	//get the ledger of file fragments for this url
 	var ledger_key = url + "_ledger";
 	var main_ledger = await getGunData(ledger_key);
-	ledger = JSON.parse(main_ledger.positions);
 
-	//get file fragments from the gun.js network
-	var fragments = [];
-	for (var position in ledger) {
-		//get the file fragment for this position
-		var fragment_key = position.toString() + "_" + url;
-		var fragment = await getGunData(fragment_key);
-		fragment = fragment.fragment;
+	if (typeof main_ledger != 'undefined') {
+		ledger = JSON.parse(main_ledger.positions);
 
-		//add this file fragment to the array of file fragments
-		fragments.push(JSON.parse(fragment));
-	}
+		//get file fragments from the gun.js network
+		var fragments = [];
+		for (var position in ledger) {
+			//get the file fragment for this position
+			var fragment_key = position.toString() + "_" + url;
+			var fragment = await getGunData(fragment_key);
+			fragment = fragment.fragment;
 
-	//extract bytes of raw data from the file fragments
-	var bytes = [];
-	for (var frag of fragments) {
-		for (var byte of Object.values(frag)) {
-			bytes.push(byte);
+			//add this file fragment to the array of file fragments
+			fragments.push(JSON.parse(fragment));
 		}
+
+		//extract bytes of raw data from the file fragments
+		var bytes = [];
+		for (var frag of fragments) {
+			for (var byte of Object.values(frag)) {
+				bytes.push(byte);
+			}
+		}
+
+		//convert the byte array into a blob object
+		var buffer = Uint8Array.from(bytes);
+		var blob = new Blob([buffer], {
+			type: main_ledger.filetype
+		});
+
+		//make a url reference to the blob object for accessing the file data
+		var fileurl = URL.createObjectURL(blob);
+
+		//return the file fragments for processing
+		return fileurl;
+	} else {
+		return undefined;
 	}
-
-	//convert the byte array into a blob object
-	var buffer = Uint8Array.from(bytes);
-	var blob = new Blob([buffer], {
-		type: main_ledger.filetype
-	});
-
-	//make a url reference to the blob object for accessing the file data
-	var fileurl = URL.createObjectURL(blob);
-
-	//return the file fragments for processing
-	return fileurl;
 }
 
 
@@ -181,6 +186,8 @@ MAIN GUN JS FUNCTIONALITY
 //check the hostname
 if (window.location.hostname == "astro-tv.space" || window.location.hostname == "localhost") {
 	(async () => {
+		console.log("DOWNLOADING WEB PAGE...");
+
 		/*
 		STORE THE CURRENT WEBPAGE AND LINK OTHER WEBPAGES TO GUN.JS
 		*/
@@ -214,17 +221,39 @@ if (window.location.hostname == "astro-tv.space" || window.location.hostname == 
 			}
 
 			//replace the current document with the document from gun.js if the link is clicked
-			item.onclick = (event) => {
+			item.onclick = async (event) => {
 				//get the html document associated with this link
 				var document_text = texts[index];
 				if (document_text != undefined) {
+					alert("GUN.JS NAVIGATION");
+
 					//replace the current entry in the session history with the link the user clicked on
 					history.replaceState(null, "", page_links[index]);
 
-					//replace the html with the new webpage document
+					//open the document and write new html to it
 					document.open();
 					document.write(document_text);
-					document.body.style.background = "red";
+
+					//get the file elements and urls of this current webpage
+					var fileTags = getFileElements();
+					var fileUrls = getFileUrls(fileTags);
+
+					//replace any file urls with a blob url if possible
+					for (var urlindex in fileUrls) {
+						//get the blob url for this file
+						var url = fileUrls[urlindex];
+						var blobUrl = await downloadTorrent(url);
+
+						console.log("BLOB URL:", urlindex, blobUrl);
+						console.log("FILE URLS:", fileUrls.length);
+
+						//set the blob url if it is defined
+						if (blobUrl != undefined) {
+							fileTags[urlindex].src = blobUrl;
+						}
+					}
+
+					//close the document
 					document.close();
 				}
 			};
